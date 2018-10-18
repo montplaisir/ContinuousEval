@@ -1,0 +1,197 @@
+
+#include "Queue.hpp"
+
+// Static class...
+class OrderByDirection
+{
+private:
+    static double _dirX;
+    static double _dirY;
+
+public:
+    // Get/Set
+    static void setDirX(double dirX) { _dirX = dirX; }
+    static void setDirY(double dirY) { _dirY = dirY; }
+    static double getDirX() { return _dirX; }
+    static double getDirY() { return _dirY; }
+
+    // Simple implementation of sorting points according
+    // to a direction. Points that match this direction
+    // the most have a higher priority.
+    static bool comp(QueuePointPtr& p1, QueuePointPtr& p2)
+    {
+        bool lowerPriority = false;
+
+        double d1x = (p1->getX() - _dirX);
+        double d1y = (p1->getY() - _dirY);
+        double val1 = (d1x * d1x) + (d1y * d1y);    // square norm
+
+        double d2x = (p2->getX() - _dirX);
+        double d2y = (p2->getY() - _dirY);
+        double val2 = (d2x * d2x) + (d2y * d2y);
+
+        // The point farthest from _dir gets lower priority.
+        if (val1 > val2)
+        {
+            lowerPriority = true;
+        }
+
+        return lowerPriority;
+    }
+};
+
+
+// Init statics
+double OrderByDirection::_dirX = 0.0;
+double OrderByDirection::_dirY = 0.0;
+
+
+// Calling argument: Number of threads to use.
+int main(int argc , char **argv)
+{
+    int nbThreads = omp_get_num_threads();
+    if (argc > 1)
+    {
+        nbThreads = std::atoi(argv[1]);
+        if (0 == nbThreads)
+        {
+            nbThreads = omp_get_num_threads();
+        }
+    }
+    std::cout << "Working with " << nbThreads << " threads." << std::endl;
+
+    // Create queue for all threads
+    LowerPriority orderByDirection(OrderByDirection::comp);
+    //LowerPriority orderDefault(LowerPriority::DefaultComp);
+    OrderByDirection::setDirX(6);
+    OrderByDirection::setDirY(-2);
+    Queue queue(orderByDirection);
+    queue.start();
+    std::cout << "Start main" << std::endl;
+
+    // Init points here... for testing purposes.
+    auto pP1 = QueuePointPtr(new QueuePoint(5, -2, 59)); // x, y, eval
+    auto pP2 = QueuePointPtr(new QueuePoint(4, -2, 58));
+    auto pP3 = QueuePointPtr(new QueuePoint(5, -1, 40));
+    auto pP4 = QueuePointPtr(new QueuePoint(4, -1, 76));
+    auto pP5 = QueuePointPtr(new QueuePoint(5, -3, 9));
+    auto pP6 = QueuePointPtr(new QueuePoint(4, -3, 38));
+    auto pP7 = QueuePointPtr(new QueuePoint(6, -2, 23));
+    auto pP8 = QueuePointPtr(new QueuePoint(6, -2, 31));
+    auto pP9 = QueuePointPtr(new QueuePoint(6, -1, 57));
+    auto pP10 = QueuePointPtr(new QueuePoint(6, -1, 11));
+    auto pP11 = QueuePointPtr(new QueuePoint(6, -3, 85));
+    auto pP12 = QueuePointPtr(new QueuePoint(6, -3, 22));
+    auto pP13 = QueuePointPtr(new QueuePoint(7, -2, 49));
+    auto pP14 = QueuePointPtr(new QueuePoint(7, -1, 66));
+    auto pP15 = QueuePointPtr(new QueuePoint(7, -3, 91));
+    auto pP16 = QueuePointPtr(new QueuePoint(4, -4, 28));
+    auto pP17 = QueuePointPtr(new QueuePoint(6, -4, 13));
+    auto pP18 = QueuePointPtr(new QueuePoint(6, -5, 21));
+    auto pP19 = QueuePointPtr(new QueuePoint(6, -5, 47));
+    auto pP20 = QueuePointPtr(new QueuePoint(7, -5, 1));
+    auto pP21 = QueuePointPtr(new QueuePoint(7, -5, 75));
+    auto pP22 = QueuePointPtr(new QueuePoint(8, -3, 12));
+    auto pP23 = QueuePointPtr(new QueuePoint(8, -2, 48));
+    auto pP24 = QueuePointPtr(new QueuePoint(8, -1, 30));
+    auto pP25 = QueuePointPtr(new QueuePoint(7.1, -3.1, 48));
+    auto pP26 = QueuePointPtr(new QueuePoint(4.1, -4.1, 43));
+    auto pP27 = QueuePointPtr(new QueuePoint(6.1, -4.1, 60));
+    auto pP28 = QueuePointPtr(new QueuePoint(6.1, -5.1, 63));
+    auto pP29 = QueuePointPtr(new QueuePoint(6.1, -5.2, 24));
+    auto pP30 = QueuePointPtr(new QueuePoint(7.1, -5.2, 49));
+    auto pP31 = QueuePointPtr(new QueuePoint(7.1, -5.3, 63));
+    auto pP32 = QueuePointPtr(new QueuePoint(8.1, -3.3, 25));
+    auto pP33 = QueuePointPtr(new QueuePoint(8.1, -2.4, 53));
+    auto pP34 = QueuePointPtr(new QueuePoint(8.1, -1.4, 17));
+    auto pP35 = QueuePointPtr(new QueuePoint(7.1, -3.5, 5));
+    auto pP36 = QueuePointPtr(new QueuePoint(4.1, -4.5, 53));
+    auto pP37 = QueuePointPtr(new QueuePoint(6.1, -4.6, 47));
+    auto pP38 = QueuePointPtr(new QueuePoint(6.1, -5.6, 59));
+    auto pP39 = QueuePointPtr(new QueuePoint(6.1, -5.7, 47));
+    auto pP40 = QueuePointPtr(new QueuePoint(7.1, -5.7, 95));
+    auto pP41 = QueuePointPtr(new QueuePoint(7.1, -5.8, 93));
+    auto pP42 = QueuePointPtr(new QueuePoint(8.1, -3.8, 85));
+    auto pP43 = QueuePointPtr(new QueuePoint(8.1, -2.9, 59));
+    auto pP44 = QueuePointPtr(new QueuePoint(8.1, -1.11, 5));
+    auto pP45 = QueuePointPtr(new QueuePoint(7.1, -3.11, 46));
+    auto pP46 = QueuePointPtr(new QueuePoint(4.1, -4.11, 83));
+    auto pP47 = QueuePointPtr(new QueuePoint(6.1, -4.8, 54));
+    auto pP48 = QueuePointPtr(new QueuePoint(6.1, -5.9, 38));
+    auto pP49 = QueuePointPtr(new QueuePoint(6.1, -5.11, 18));
+
+    // Parameters used for all threads
+    int nbEval = 6;
+
+    // Could be done better: stopEval is a mix of success (opportunistic)
+    // and of other conditions (stopMainEval())
+    bool stopEval = false;
+
+    // Start all processes
+    #pragma omp parallel num_threads(nbThreads) default(shared)
+    {
+        // Create points in master thread only
+        #pragma omp master
+        {
+            // Set P1 for these points
+            pP6->setP1(true);
+            pP7->setP1(true);
+            pP8->setP1(true);
+            pP13->setP1(true);
+            pP14->setP1(true);
+            pP15->setP1(true);
+            pP16->setP1(true);
+            pP17->setP1(true);
+            pP23->setP1(true);
+
+            queue.startAdding();
+            for (QueuePointPtr pp : { pP1, pP2, pP3, pP4, pP5, pP6, pP7, pP8, \
+                                      pP9, pP10, pP11, pP12, pP13, pP14, pP15, \
+                                      pP16, pP17, pP18, pP19, pP20, pP21, pP22, \
+                                      pP23, pP24 })
+            {
+                queue.addToQueue(pp);
+            }
+            queue.stopAdding();
+
+            std::cout << "Done adding points, master only." << std::endl;
+        }   // End of adding points, master only
+
+        // Launch evaluation on all threads, including master.
+        std::cout << "Launch run for thread " << omp_get_thread_num() << std::endl;
+        stopEval = queue.run();
+
+        // From here, only master is out of queue.run(). The other
+        // threads are waiting for evaluation.
+        // So we work on master only.
+        #pragma omp master
+        {
+            queue.setAllP1ToFalse();
+
+            std::cout << std::endl << "Adding new points..." << std::endl;
+            queue.startAdding();
+            for (QueuePointPtr pp : { pP1, pP2, pP3, pP4, pP5, pP6, pP13, pP14, \
+                                      pP15, pP16, pP17, pP18, pP19, pP20, pP21, \
+                                      pP22, pP23, pP24, pP25, pP26, pP27, pP28, \
+                                      pP29, pP30, pP31, pP32, pP33, pP34, pP35, \
+                                      pP36, pP37, pP38, pP39, pP40, pP41, pP42, \
+                                      pP43, pP44, pP45, pP46, pP47, pP48, pP49
+                                      })
+            {
+                queue.addToQueue(pp);
+            }
+            queue.stopAdding();
+
+            // All, the threads other than master are still available for evaluation.
+            // Re-launch run for master only.
+            std::cout << "Launch run for thread " << omp_get_thread_num() << std::endl;
+            stopEval = queue.run();
+
+            std::cout << "Ready to stop." << std::endl;
+            // Stop queue for all threads
+            queue.stop();
+        }   // End master thread
+    }   // End parallel region
+
+    return 0;
+}
