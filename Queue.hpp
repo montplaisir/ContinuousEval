@@ -15,8 +15,8 @@ class Queue
 private:
     // The Queue of Points
     std::vector<QueuePointPtr> _queue;
-    bool _doneWithEval;         // All evaluations done. Queue can be destroyed.
-    mutable omp_lock_t _lockForAdd;     // When we add, we do not want to eval.
+    bool _doneWithEval;             // All evaluations done. Queue can be destroyed.
+    mutable omp_lock_t _queueLock;  // Do not launch new evaluations when queue is locked, e.g. for adding points.
 
 
 public:
@@ -24,16 +24,16 @@ public:
     explicit Queue()
       : _queue(),
         _doneWithEval(false),
-        _lockForAdd()
+        _queueLock()
     {
-        omp_init_lock(&_lockForAdd);
+        omp_init_lock(&_queueLock);
         //run();    // Do not start queue here: wait until we are in parallel zone.
     }
 
     // Destructor, could be needed to destroy lock.
     virtual ~Queue()
     {
-        omp_destroy_lock(&_lockForAdd);
+        omp_destroy_lock(&_queueLock);
     }
 
     // Get/Set
