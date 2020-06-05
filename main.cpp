@@ -62,10 +62,11 @@ int main(int argc , char **argv)
 
     // Create queue for all threads
     LowerPriority orderByDirection(OrderByDirection::comp);
-    //LowerPriority orderDefault(LowerPriority::DefaultComp);
     OrderByDirection::setDirX(6);
     OrderByDirection::setDirY(-2);
-    Queue queue(orderByDirection);
+    //Queue queue(orderByDirection);
+    // TODO: Implement new sorting (on vector, instead of using a priority_queue)
+    Queue queue;
     queue.start();
     std::cout << "Start main" << std::endl;
 

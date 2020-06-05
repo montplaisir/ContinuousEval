@@ -18,13 +18,27 @@ void Queue::addToQueue(const QueuePointPtr point)
     {
         std::cerr << "Warning, tring to add an element to a queue that was not locked." << std::endl;
     }
-    _queue.push(point);
+    _queue.push_back(point);
 }
 
 
 void Queue::stopAdding()
 {
+    // TODO: Here, sort queue.
     omp_unset_lock(&_lockForAdd);
+}
+
+
+QueuePointPtr Queue::getTopPoint() const
+{
+    QueuePointPtr retPoint = nullptr;
+    omp_set_lock(&_lockForAdd);
+    if (!_queue.empty())
+    {
+        retPoint = _queue[_queue.size()-1];
+    }
+    omp_unset_lock(&_lockForAdd);
+    return retPoint;
 }
 
 
@@ -38,8 +52,9 @@ bool Queue::popPoint(QueuePointPtr &point)
     omp_set_lock(&_lockForAdd);  // the thread will wait until the lock is available.
     if (!_queue.empty())
     {
-        point = std::move(_queue.top());
-        _queue.pop();
+        // Remove last element, simulate a "pop".
+        point = std::move(_queue[_queue.size()-1]);
+        _queue.erase(_queue.end()-1);
         success = true;
     }
     omp_unset_lock(&_lockForAdd);
@@ -131,7 +146,7 @@ bool Queue::stopMainEval() const
             // If we have a P1, we have not evaluated all P1.
             // If we don't have a P1, we can stop evaluation for
             // the main thread.
-            bool stillInP1 = _queue.top()->getP1();
+            bool stillInP1 = getTopPoint()->getP1();
             stop = !stillInP1;
         }
     }
@@ -149,14 +164,14 @@ void Queue::setAllP1ToFalse()
         // Pop, Set P1 to false, and push back.
         // Pop all P1 points (they are all at the front).
         // Set P1 to false.
-        while (_queue.top()->getP1())
+        QueuePointPtr point;
+        while (getTopPoint()->getP1() && popPoint(point))
         {
-            auto point = std::move(_queue.top());
             std::cout << "Pop P1" << std::endl;
-            _queue.pop();
             point->setP1(false);
-            _queue.push(point);
+            _queue.push_back(point);
         }
+        // VRM TODO sort queue here? / rewrite this method since we don't use a priority_queue anymore.
     }
     omp_unset_lock(&_lockForAdd);
 }
@@ -165,10 +180,7 @@ void Queue::setAllP1ToFalse()
 void Queue::clearQueue()
 {
     omp_set_lock(&_lockForAdd);
-    while (!_queue.empty())
-    {
-        _queue.pop();
-    }
+    _queue.clear();
     omp_unset_lock(&_lockForAdd);
 }
 
@@ -176,11 +188,10 @@ void Queue::clearQueue()
 void Queue::displayAndClear()
 {
     omp_set_lock(&_lockForAdd);
-    while (!_queue.empty())
+    QueuePointPtr point;
+    while (!_queue.empty() && popPoint(point))
     {
-        auto point = std::move(_queue.top());
         std::cout << *point << std::endl;
-        _queue.pop();
     }
     omp_unset_lock(&_lockForAdd);
 }
