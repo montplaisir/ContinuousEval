@@ -2,22 +2,42 @@
 #ifndef __QUEUE_HPP__
 #define __QUEUE_HPP__
 
+#include <map>
+#include <set>
 #include <vector>
 
 #include "QueuePoint.hpp"
 
 class MainThreadInfo
 {
+private:
+    bool _doneWithEval;             // All evaluations done for this main thread
+
+public:
+    explicit MainThreadInfo()
+      : _doneWithEval(false)
+    {
+    }
+
+    void setDoneWithEval(const bool doneWithEval)
+    {
+        _doneWithEval = doneWithEval;
+    }
+
+    bool getDoneWithEval() const { return _doneWithEval; }
+
 };
+
 
 class Queue
 {
 private:
-    // The Queue of Points
-    std::vector<QueuePointPtr> _queue;
+    std::vector<QueuePointPtr> _queue;  // The queue of points
     LowerPriority _comp;            // Comparison function used for sorting
-    bool _doneWithEval;             // All evaluations done. Queue can be destroyed.
+    bool _doneWithEval;             // All evaluations done for all main threads. Queue can be destroyed.
     mutable omp_lock_t _queueLock;  // Do not launch new evaluations when queue is locked, e.g. for adding points.
+    std::set<int> _mainThreads;     // Thread numbers of main threads
+    std::map<int, MainThreadInfo> _mainThreadInfo;
 
 
 public:
@@ -26,9 +46,12 @@ public:
       : _queue(),
         _comp(comp),
         _doneWithEval(false),
-        _queueLock()
+        _queueLock(),
+        _mainThreads(),
+        _mainThreadInfo()
     {
         omp_init_lock(&_queueLock);
+        addMainThread(omp_get_thread_num());
         //run();    // Do not start queue here: wait until we are in parallel zone.
     }
 
@@ -41,14 +64,25 @@ public:
     // Get/Set
     int getQueueSize() const { return _queue.size(); }
 
+    void addMainThread(const int threadNum)
+    {
+        _mainThreads.insert(threadNum);
+        MainThreadInfo threadInfo;
+        auto threadInfoPair = std::pair<const int, const MainThreadInfo&>(threadNum, threadInfo);
+        _mainThreadInfo.insert(threadInfoPair);
+    }
+    bool isMainThread(const int threadNum) const { return (_mainThreads.end() != _mainThreads.find(threadNum)); }
+    const std::set<int>& getMainThreads() const { return _mainThreads; }
+    size_t getNbMainThreads() const { return _mainThreads.size(); }
+
     // Other methods
 
     // Start evaluation
     void start() {}
     // Continuous evaluation
     bool run();
-    // Stop evaluation
-    void stop() { _doneWithEval = true; }
+    // Stop evaluation for the current thread (which should be a main thread)
+    void stop();
 
     /// Sort the queue with respect to the comparison function comp.
     void sort(LowerPriority comp);

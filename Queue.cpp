@@ -5,9 +5,11 @@
 
 omp_lock_t _queueLock;
 
+const bool debugLock = false;
 
 void Queue::startAdding()
 {
+    if (debugLock) std::cout << "DEBUG: startAdding locks queue for thread " << omp_get_thread_num() << std::endl;
     omp_set_lock(&_queueLock);
 }
 
@@ -25,6 +27,7 @@ void Queue::addToQueue(const QueuePointPtr point)
 
 void Queue::stopAdding()
 {
+    if (debugLock) std::cout << "DEBUG: stopAdding unlocks queue for thread " << omp_get_thread_num() << std::endl;
     omp_unset_lock(&_queueLock);
     // sort queue
     sort();
@@ -34,11 +37,13 @@ void Queue::stopAdding()
 QueuePointPtr Queue::getTopPoint() const
 {
     QueuePointPtr retPoint = nullptr;
+    if (debugLock) std::cout << "DEBUG: getTopPoint locks queue for thread " << omp_get_thread_num() << std::endl;
     omp_set_lock(&_queueLock);
     if (!_queue.empty())
     {
         retPoint = _queue[_queue.size()-1];
     }
+    if (debugLock) std::cout << "DEBUG: getTopPoint unlocks queue for thread " << omp_get_thread_num() << std::endl;
     omp_unset_lock(&_queueLock);
     return retPoint;
 }
@@ -51,6 +56,7 @@ bool Queue::popPoint(QueuePointPtr &point)
     bool success = false;
     // We need to set the lock before checking if
     // the queue is empty. Or else, we risk a seg fault.
+    if (debugLock) std::cout << "DEBUG: popPoint locks queue for thread " << omp_get_thread_num() << std::endl;
     omp_set_lock(&_queueLock);  // the thread will wait until the lock is available.
     if (!_queue.empty())
     {
@@ -59,6 +65,7 @@ bool Queue::popPoint(QueuePointPtr &point)
         _queue.erase(_queue.end()-1);
         success = true;
     }
+    if (debugLock) std::cout << "DEBUG: popPoint unlocks queue for thread " << omp_get_thread_num() << std::endl;
     omp_unset_lock(&_queueLock);
 
     return success;
@@ -69,16 +76,16 @@ bool Queue::run()
 {
     bool successFound = false;
 
-    // Queue runs forever on non-master threads.
-    // On master, queue runs until stopMainEval() is true.
+    // Queue runs forever on non-main threads.
+    // On main threads, queue runs until stopMainEval() is true.
     bool conditionForStop = false;
 
-    // conditionForStop is true if we are in master thread and stopMainEval() returns true.
+    // conditionForStop is true if we are in a main thread and stopMainEval() returns true.
     while (!conditionForStop && !_doneWithEval)
     {
         std::cout << "In Queue::run(). Thread: " << omp_get_thread_num() << std::endl;
         // Check for stop conditions
-        #pragma omp master
+        if (isMainThread(omp_get_thread_num()))
         {
             conditionForStop = stopMainEval();
         }
@@ -98,7 +105,7 @@ bool Queue::run()
         }
    
         usleep(100000);
-    }   // End of while loop: Exit for master thread.
+    }   // End of while loop: Exit for main threads.
         // Other threads keep on looping.
     std::cout << "Thread " << omp_get_thread_num() << " is out of while loop" << std::endl;
 
@@ -106,14 +113,41 @@ bool Queue::run()
 }
 
 
+void Queue::stop()
+{
+    int threadNum = omp_get_thread_num();
+    _mainThreadInfo.at(threadNum).setDoneWithEval(true);
+
+    // Go through all main thread info to see if _doneWithEval must be set.
+    // This part is not optimized, we can probably do better, but it does not 
+    // seem like a bottleneck.
+    bool allDone = true;
+    for (int mainThreadNum : _mainThreads)
+    {
+        if (allDone && !_mainThreadInfo.at(mainThreadNum).getDoneWithEval())
+        {
+            allDone = false;
+        }
+    }
+
+    if (allDone)
+    {
+        _doneWithEval = true;
+    }
+
+}
+
+
 void Queue::sort(LowerPriority comp)
 {
     if (!_queue.empty())
     {
+        if (debugLock) std::cout << "DEBUG: sort locks queue for thread " << omp_get_thread_num() << std::endl;
         omp_set_lock(&_queueLock);
 
         std::sort(_queue.begin(), _queue.end(), comp);
 
+        if (debugLock) std::cout << "DEBUG: sort unlocks queue for thread " << omp_get_thread_num() << std::endl;
         omp_unset_lock(&_queueLock);
     }
 }
@@ -154,22 +188,20 @@ bool Queue::evalSinglePoint()
 bool Queue::stopMainEval() const
 {
     bool stop = false;
-    // Master thread
-    if (omp_get_thread_num() == 0)
+    // This method was called from a main thread. No need to verify
+    // thread number.
+    if (_queue.empty())
     {
-        if (_queue.empty())
-        {
-            stop = true;
-        }
-        else
-        {
-            // Are we still evaluating P1s?
-            // If we have a P1, we have not evaluated all P1.
-            // If we don't have a P1, we can stop evaluation for
-            // the main thread.
-            bool stillInP1 = getTopPoint()->getP1();
-            stop = !stillInP1;
-        }
+        stop = true;
+    }
+    else
+    {
+        // Are we still evaluating P1s?
+        // If we have a P1, we have not evaluated all P1.
+        // If we don't have a P1, we can stop evaluation for
+        // the main thread.
+        bool stillInP1 = getTopPoint()->getP1();
+        stop = !stillInP1;
     }
 
     return stop;
@@ -201,8 +233,10 @@ void Queue::setAllP1ToFalse()
 
 void Queue::clearQueue()
 {
+    if (debugLock) std::cout << "DEBUG: clearQueue locks queue for thread " << omp_get_thread_num() << std::endl;
     omp_set_lock(&_queueLock);
     _queue.clear();
+    if (debugLock) std::cout << "DEBUG: clearQueue unlocks queue for thread " << omp_get_thread_num() << std::endl;
     omp_unset_lock(&_queueLock);
 }
 

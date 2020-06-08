@@ -49,6 +49,7 @@ double OrderByDirection::_dirY = 0.0;
 // Calling argument: Number of threads to use.
 int main(int argc , char **argv)
 {
+    const int nbMainThreads = 3;
     int nbThreads = omp_get_num_threads();
     if (argc > 1)
     {
@@ -58,7 +59,15 @@ int main(int argc , char **argv)
             nbThreads = omp_get_num_threads();
         }
     }
-    std::cout << "Working with " << nbThreads << " threads." << std::endl;
+    if (nbThreads < nbMainThreads)
+    {
+        std::cout << "Warning: number of threads was " << nbThreads << ". Set to " << nbMainThreads*2 << "." << std::endl;
+        nbThreads = nbMainThreads*2;
+    }
+    else
+    {
+        std::cout << "Working with " << nbThreads << " threads." << std::endl;
+    }
 
     // Create queue for all threads
     LowerPriority orderByDirection(OrderByDirection::comp);
@@ -121,6 +130,17 @@ int main(int argc , char **argv)
     auto pP48 = QueuePointPtr(new QueuePoint(6.1, -5.9, 38));
     auto pP49 = QueuePointPtr(new QueuePoint(6.1, -5.11, 18));
 
+    // Set P1 for these points
+    pP6->setP1(true);
+    pP7->setP1(true);
+    pP8->setP1(true);
+    pP13->setP1(true);
+    pP14->setP1(true);
+    pP15->setP1(true);
+    pP16->setP1(true);
+    pP17->setP1(true);
+    pP23->setP1(true);
+
     // Parameters used for all threads
     int nbEval = 6;
 
@@ -131,42 +151,87 @@ int main(int argc , char **argv)
     // Start all processes
     #pragma omp parallel num_threads(nbThreads) default(shared)
     {
-        // Create points in master thread only
-        #pragma omp master
+        // June 2020: Modify code so we have nbMainThreads main threads, instead of one.
+        // Other threads are secundary threads, for evaluations only.
+        //
+        // Create points in main threads only
+        // The first nbMainThreads threads that reach this point are considered main threads.
+        // The master thread (number 0) has to be in that set.
+        int threadNum = omp_get_thread_num();
+        #pragma omp critical(addMainThread)
         {
-            // Set P1 for these points
-            pP6->setP1(true);
-            pP7->setP1(true);
-            pP8->setP1(true);
-            pP13->setP1(true);
-            pP14->setP1(true);
-            pP15->setP1(true);
-            pP16->setP1(true);
-            pP17->setP1(true);
-            pP23->setP1(true);
-
-            queue.startAdding();
-            for (QueuePointPtr pp : { pP1, pP2, pP3, pP4, pP5, pP6, pP7, pP8, \
-                                      pP9, pP10, pP11, pP12, pP13, pP14, pP15, \
-                                      pP16, pP17, pP18, pP19, pP20, pP21, pP22, \
-                                      pP23, pP24 })
+            if (queue.getNbMainThreads() < nbMainThreads)
             {
-                queue.addToQueue(pp);
+                queue.addMainThread(threadNum);
             }
-            queue.stopAdding();
+        }
 
-            std::cout << "Done adding points, master only." << std::endl;
-        }   // End of adding points, master only
+        #pragma omp barrier
+
+        #pragma omp single
+        {
+            std::cout << "Main threads are:";
+            for (int thnum : queue.getMainThreads())
+            {
+                std::cout << " " << thnum;
+            }
+            std::cout << std::endl;
+        }
+
+
+        // Each main thread will generate some points and add them to the queue.
+        if (queue.isMainThread(threadNum))
+        {
+            #pragma omp single nowait
+            {
+                //std::cout << "Start adding points for main thread " << threadNum << std::endl;
+                queue.startAdding();
+                for (QueuePointPtr pp : { pP1, pP2, pP3, pP4, pP5, pP6, pP7, pP8 })
+                {
+                    queue.addToQueue(pp);
+                }
+                queue.stopAdding();
+                //std::cout << "Done adding points for main thread " << threadNum << std::endl;
+            }
+            #pragma omp single nowait
+            {
+                //std::cout << "Start adding points for main thread " << threadNum << std::endl;
+                queue.startAdding();
+                for (QueuePointPtr pp : { pP9, pP10, pP11, pP12, pP13, pP14, pP15, pP16 })
+                {
+                    queue.addToQueue(pp);
+                }
+                queue.stopAdding();
+                //std::cout << "Done adding points for main thread " << threadNum << std::endl;
+            }
+            #pragma omp single nowait
+            {
+                //std::cout << "Start adding points for main thread " << threadNum << std::endl;
+                queue.startAdding();
+                for (QueuePointPtr pp : { pP17, pP18, pP19, pP20, pP21, pP22, pP23, pP24 })
+                {
+                    queue.addToQueue(pp);
+                }
+                queue.stopAdding();
+                //std::cout << "Done adding points for main thread " << threadNum << std::endl;
+            }
+
+        }   // End of adding points, main threads only
+
+        // Adding a barrier here is not ideal. TODO see if we can get rid of it.
+        //#pragma omp barrier
 
         // Launch evaluation on all threads, including master.
         std::cout << "Launch run for thread " << omp_get_thread_num() << std::endl;
         stopEval = queue.run();
+        std::cout << "Done runing for thread " << omp_get_thread_num() << std::endl;
 
-        // From here, only master is out of queue.run(). The other
+        // From here, only main threads are out of queue.run(). The other
         // threads are waiting for evaluation.
-        // So we work on master only.
-        #pragma omp master
+        // So we work on main threads only.
+        if (queue.isMainThread(threadNum))
         {
+            /*
             queue.setAllP1ToFalse();
 
             std::cout << std::endl << "Adding new points..." << std::endl;
@@ -187,6 +252,7 @@ int main(int argc , char **argv)
             // Re-launch run for master only.
             std::cout << "Launch run for thread " << omp_get_thread_num() << std::endl;
             stopEval = queue.run();
+            */
 
             std::cout << "Ready to stop." << std::endl;
             // Stop queue for all threads
