@@ -27,8 +27,7 @@ void Queue::stopAdding()
 {
     omp_unset_lock(&_queueLock);
     // sort queue
-    LowerPriority comp;
-    sort(comp);
+    sort();
 }
 
 
@@ -187,8 +186,7 @@ void Queue::setAllP1ToFalse()
             _queue.push_back(point);
         }
         // re-sort queue
-        LowerPriority comp;
-        sort(comp);
+        sort();
     }
     //omp_unset_lock(&_queueLock);
 }
