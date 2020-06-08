@@ -15,14 +15,16 @@ class Queue
 private:
     // The Queue of Points
     std::vector<QueuePointPtr> _queue;
+    LowerPriority _comp;            // Comparison function used for sorting
     bool _doneWithEval;             // All evaluations done. Queue can be destroyed.
     mutable omp_lock_t _queueLock;  // Do not launch new evaluations when queue is locked, e.g. for adding points.
 
 
 public:
     // Constructor
-    explicit Queue()
+    explicit Queue(LowerPriority comp)
       : _queue(),
+        _comp(comp),
         _doneWithEval(false),
         _queueLock()
     {
@@ -50,6 +52,9 @@ public:
 
     /// Sort the queue with respect to the comparison function comp.
     void sort(LowerPriority comp);
+
+    /// Use the default comparison function _comp.
+    void sort() { sort(_comp); }
   
     // Eval a single point (mock eval). Pop it from queue.
     // Return true (success) if eval is better than point's best eval.

@@ -66,7 +66,7 @@ public:
     {}
 
 
-    // Comparison operator for sorting queue points (at insertion).
+    // Comparison operator for sorting queue points.
     // Points P1 are always prioritary.
     bool operator()(QueuePointPtr& p1, QueuePointPtr& p2)
     {

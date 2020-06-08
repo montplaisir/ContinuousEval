@@ -67,8 +67,7 @@ int main(int argc , char **argv)
     // Queue queue(orderByDirection);
     // June 2020: Sorting is now on vector, instead of using a priority_queue, and will be
     // done when stopAdding() is called.
-    Queue queue;
-    queue.sort(orderByDirection);
+    Queue queue(orderByDirection);
     queue.start();
     std::cout << "Start main" << std::endl;
 
