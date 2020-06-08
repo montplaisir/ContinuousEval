@@ -68,14 +68,22 @@ bool Queue::popPoint(QueuePointPtr &point)
 bool Queue::run()
 {
     bool successFound = false;
-    bool doStopMainEval = false;
 
     // Queue runs forever on non-master threads.
     // On master, queue runs until stopMainEval() is true.
-    while (!doStopMainEval && !_doneWithEval)
+    bool conditionForStop = false;
+
+    // conditionForStop is true if we are in master thread and stopMainEval() returns true.
+    while (!conditionForStop && !_doneWithEval)
     {
         std::cout << "In Queue::run(). Thread: " << omp_get_thread_num() << std::endl;
-        if (!_queue.empty())
+        // Check for stop conditions
+        #pragma omp master
+        {
+            conditionForStop = stopMainEval();
+        }
+
+        if (!conditionForStop && !_queue.empty())
         {
             //std::cout << "Thread: " << omp_get_thread_num() << " Calling EvalSinglePoint()." << std::endl;
             successFound = evalSinglePoint();
@@ -90,9 +98,8 @@ bool Queue::run()
         }
    
         usleep(100000);
-        // VRM Review this and do like current NOMAD 4.
-        doStopMainEval = stopMainEval();
-    }
+    }   // End of while loop: Exit for master thread.
+        // Other threads keep on looping.
     std::cout << "Thread " << omp_get_thread_num() << " is out of while loop" << std::endl;
 
     return successFound;
