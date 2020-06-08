@@ -64,9 +64,8 @@ int main(int argc , char **argv)
     LowerPriority orderByDirection(OrderByDirection::comp);
     OrderByDirection::setDirX(6);
     OrderByDirection::setDirY(-2);
-    // Queue queue(orderByDirection);
-    // June 2020: Sorting is now on vector, instead of using a priority_queue, and will be
-    // done when stopAdding() is called.
+    // June 2020: Queue is now a vector, instead of using a priority_queue.
+    // Sorting is done when stopAdding() is called.
     Queue queue(orderByDirection);
     queue.start();
     std::cout << "Start main" << std::endl;
