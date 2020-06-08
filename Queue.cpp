@@ -1,6 +1,7 @@
 #include "Queue.hpp"
 
-#include <unistd.h> // For usleep
+#include <algorithm>    // For sort
+#include <unistd.h>     // For usleep
 
 omp_lock_t _queueLock;
 
@@ -24,8 +25,10 @@ void Queue::addToQueue(const QueuePointPtr point)
 
 void Queue::stopAdding()
 {
-    // TODO: Here, sort queue.
     omp_unset_lock(&_queueLock);
+    // sort queue
+    LowerPriority comp;
+    sort(comp);
 }
 
 
@@ -94,6 +97,19 @@ bool Queue::run()
     std::cout << "Thread " << omp_get_thread_num() << " is out of while loop" << std::endl;
 
     return successFound;
+}
+
+
+void Queue::sort(LowerPriority comp)
+{
+    if (!_queue.empty())
+    {
+        omp_set_lock(&_queueLock);
+
+        std::sort(_queue.begin(), _queue.end(), comp);
+
+        omp_unset_lock(&_queueLock);
+    }
 }
 
 
@@ -170,7 +186,9 @@ void Queue::setAllP1ToFalse()
             point->setP1(false);
             _queue.push_back(point);
         }
-        // VRM TODO sort queue here? / rewrite this method since we don't use a priority_queue anymore.
+        // re-sort queue
+        LowerPriority comp;
+        sort(comp);
     }
     //omp_unset_lock(&_queueLock);
 }

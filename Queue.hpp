@@ -48,6 +48,9 @@ public:
     // Stop evaluation
     void stop() { _doneWithEval = true; }
 
+    /// Sort the queue with respect to the comparison function comp.
+    void sort(LowerPriority comp);
+  
     // Eval a single point (mock eval). Pop it from queue.
     // Return true (success) if eval is better than point's best eval.
     bool evalSinglePoint();
