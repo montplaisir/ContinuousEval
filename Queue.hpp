@@ -2,127 +2,78 @@
 #ifndef __QUEUE_HPP__
 #define __QUEUE_HPP__
 
-#include <functional>   // For std::function
-#include <iostream>
-#include <memory>       // For shared_ptr
-#include <omp.h>
-#include <queue>        // For priority_queue
+#include <map>
+#include <set>
+#include <vector>
 
-class QueuePoint
+#include "QueuePoint.hpp"
+
+class MainThreadInfo
 {
 private:
-    // In fact, the QueuePoint must have a pointer to some kind
-    // of point (e.g. EvalPoint), not replicate its members.
-    // I.e. _x,_y but also _eval should be hidden, and the _comp
-    // of the Queue is related to that outside point class.
-    // Not sure where _bestEval would reside.
-    // _P1 remains here.
-
-    // Point has 2 coordinates
-    double  _x;
-    double  _y;
-    // Value of evaluation
-    double _eval;
-    // Value to which evaluation will be compared
-    double  _bestEval;
-    // Is this a "priority 1" point to eval?
-    // P1 points are always evaluated first, and the algorithm
-    // only continues when all P1 points are evaluated / or when
-    // a success is found.
-    bool _P1;
+    bool _doneWithEval;             // All evaluations done for this main thread
 
 public:
-    QueuePoint(double x, double y, double bestEval)
-      : _x(x),
-        _y(y),
-        _eval(0),
-        _bestEval(bestEval),
-        _P1(false)
-    {}
+    explicit MainThreadInfo()
+      : _doneWithEval(false)
+    {
+    }
 
-    // Get/Set
-    double getX() const { return _x; }
-    double getY() const { return _y; }
-    double getEval() const { return _eval; }
-    void setEval(const double eval) { _eval = eval; }
-    double getBestEval() const { return _bestEval; }
-    void setP1(const bool p1) { _P1 = p1; }
-    bool getP1() const { return _P1; }
+    void setDoneWithEval(const bool doneWithEval)
+    {
+        _doneWithEval = doneWithEval;
+    }
+
+    bool getDoneWithEval() const { return _doneWithEval; }
 
 };
 
-typedef std::shared_ptr<QueuePoint> QueuePointPtr;
 
-std::ostream& operator<<(std::ostream& out, const QueuePoint& point);
-
-
-class LowerPriority {
+class Queue
+{
 private:
-    std::function<bool(QueuePointPtr &p1, QueuePointPtr &p2)> _comp;
-
-public:
-    // Constructor
-    LowerPriority(const std::function<bool(QueuePointPtr &p1, QueuePointPtr &p2)> comp = std::function<bool(QueuePointPtr &p1, QueuePointPtr &p2)>(DefaultComp))
-      : _comp(comp)
-    {}
-
-
-    // Comparison operator for sorting queue points (at insertion).
-    // Points P1 are always prioritary.
-    bool operator()(QueuePointPtr& p1, QueuePointPtr& p2)
-    {
-        bool hasLowerPriority = false;
-        
-        if (p1->getP1() != p2->getP1())
-        {
-            hasLowerPriority = (p1->getP1() < p2->getP1());
-        }
-        else
-        {
-            hasLowerPriority = _comp(p1, p2);
-        }
-
-        return hasLowerPriority;
-    }
-
-    // Priority is lower if evaluation is higher.
-    static bool DefaultComp(QueuePointPtr& p1, QueuePointPtr& p2)
-    {
-        return (p1->getBestEval() > p2->getBestEval());
-    }
-};
-
-
-class Queue {
-private:
-    // The Queue of Points
-    std::priority_queue<QueuePointPtr, 
-                        std::vector<QueuePointPtr>,
-                        LowerPriority> _queue;
-    bool _doneWithEval;         // All evaluations done. Queue can be destroyed.
-    //static int _sLocksForAdd;   // When we add, we do not want to eval.
-    omp_lock_t _lockForAdd;     // When we add, we do not want to eval.
+    std::vector<QueuePointPtr> _queue;  // The queue of points
+    LowerPriority _comp;            // Comparison function used for sorting
+    bool _doneWithEval;             // All evaluations done for all main threads. Queue can be destroyed.
+    mutable omp_lock_t _queueLock;  // Do not launch new evaluations when queue is locked, e.g. for adding points.
+    std::set<int> _mainThreads;     // Thread numbers of main threads
+    std::map<int, MainThreadInfo> _mainThreadInfo;
 
 
 public:
     // Constructor
-    explicit Queue(LowerPriority lowerPriority)
-      : _queue(lowerPriority),
+    explicit Queue(LowerPriority comp)
+      : _queue(),
+        _comp(comp),
         _doneWithEval(false),
-        _lockForAdd()
+        _queueLock(),
+        _mainThreads(),
+        _mainThreadInfo()
     {
-        omp_init_lock(&_lockForAdd);
+        omp_init_lock(&_queueLock);
+        addMainThread(omp_get_thread_num());
         //run();    // Do not start queue here: wait until we are in parallel zone.
     }
 
     // Destructor, could be needed to destroy lock.
     virtual ~Queue()
     {
-        omp_destroy_lock(&_lockForAdd);
+        omp_destroy_lock(&_queueLock);
     }
 
     // Get/Set
     int getQueueSize() const { return _queue.size(); }
+
+    void addMainThread(const int threadNum)
+    {
+        _mainThreads.insert(threadNum);
+        MainThreadInfo threadInfo;
+        auto threadInfoPair = std::pair<const int, const MainThreadInfo&>(threadNum, threadInfo);
+        _mainThreadInfo.insert(threadInfoPair);
+    }
+    bool isMainThread(const int threadNum) const { return (_mainThreads.end() != _mainThreads.find(threadNum)); }
+    const std::set<int>& getMainThreads() const { return _mainThreads; }
+    int getNbMainThreads() const { return int(_mainThreads.size()); }
 
     // Other methods
 
@@ -130,9 +81,15 @@ public:
     void start() {}
     // Continuous evaluation
     bool run();
-    // Stop evaluation
-    void stop() { _doneWithEval = true; }
+    // Stop evaluation for the current thread (which should be a main thread)
+    void stop();
 
+    /// Sort the queue with respect to the comparison function comp.
+    void sort(LowerPriority comp);
+
+    /// Use the default comparison function _comp.
+    void sort() { sort(_comp); }
+  
     // Eval a single point (mock eval). Pop it from queue.
     // Return true (success) if eval is better than point's best eval.
     bool evalSinglePoint();
@@ -150,11 +107,13 @@ public:
     // Add a single Point to the Queue
     void addToQueue(const QueuePointPtr point);
 
+    QueuePointPtr getTopPoint() const;
+
     // get the top Point from the queue and pop it.
     // Return true if it worked, false otherwise.
     bool popPoint(QueuePointPtr &point);
 
-    // Display all points in the queue, in order of priority.
+    // Display all points in the queue
     // Clear it at the same time.
     void displayAndClear();
 
