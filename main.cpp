@@ -167,7 +167,7 @@ int main(int argc , char **argv)
         // The first nbMainThreads threads that reach this point are considered main threads.
         // The master thread (number 0) has to be in that set.
         int threadNum = omp_get_thread_num();
-        #pragma omp critical(addMainThread)
+        #pragma omp critical(printInfo)
         {
             if (queue.getNbMainThreads() < nbMainThreads)
             {
@@ -231,9 +231,15 @@ int main(int argc , char **argv)
         //#pragma omp barrier
 
         // Launch evaluation on all threads, including master.
-        std::cout << "Launch run for thread " << omp_get_thread_num() << std::endl;
+        #pragma omp critical(printInfo)
+        {
+            std::cout << "Launch run for thread " << omp_get_thread_num() << std::endl;
+        }
         stopEval = queue.run();
-        std::cout << "Done runing for thread " << omp_get_thread_num() << std::endl;
+        #pragma omp critical(printInfo)
+        {
+            std::cout << "Done running for thread " << omp_get_thread_num() << std::endl;
+        }
 
         // From here, only main threads are out of queue.run(). The other
         // threads are waiting for evaluation.
@@ -242,7 +248,10 @@ int main(int argc , char **argv)
         {
             queue.setAllP1ToFalse();
 
-            std::cout << std::endl << "Adding new points..." << std::endl;
+            #pragma omp critical(printInfo)
+            {
+                std::cout << std::endl << "Adding new points..." << std::endl;
+            }
             #pragma omp single nowait
             {
                 queue.startAdding();
@@ -261,11 +270,17 @@ int main(int argc , char **argv)
 
             // All, the threads other than main are still available for evaluation.
             // Re-launch run for main threads only.
-            std::cout << "Launch run for thread " << omp_get_thread_num() << std::endl;
+            #pragma omp critical(printInfo)
+            {
+                std::cout << "Launch run for thread " << omp_get_thread_num() << std::endl;
+            }
             stopEval = queue.run();
 
-            std::cout << "Ready to stop." << std::endl;
-            // Stop queue for this main threads
+            #pragma omp critical(printInfo)
+            {
+                std::cout << "Ready to stop for main thread " << omp_get_thread_num() << std::endl;
+            }
+            // Stop queue for this main thread
             queue.stop();
         }   // End main thread
     }   // End parallel region
