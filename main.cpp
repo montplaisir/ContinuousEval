@@ -150,9 +150,6 @@ int main(int argc , char **argv)
     pP17->setP1(true);
     pP23->setP1(true);
 
-    // Parameters used for all threads
-    int nbEval = 6;
-
     // Start all processes
     #pragma omp parallel num_threads(nbThreads) default(shared)
     {
