@@ -158,7 +158,10 @@ int main(int argc , char **argv)
         }   // End of adding points, master only
 
         // Launch evaluation on all threads, including master.
-        std::cout << "Launch run for thread " << omp_get_thread_num() << std::endl;
+        #pragma omp critical(printInfo)
+        {
+            std::cout << "Launch run for thread " << omp_get_thread_num() << std::endl;
+        }
         stopEval = queue.run();
 
         // From here, only master is out of queue.run(). The other
@@ -184,7 +187,7 @@ int main(int argc , char **argv)
 
             // All, the threads other than master are still available for evaluation.
             // Re-launch run for master only.
-            std::cout << "Launch run for thread " << omp_get_thread_num() << std::endl;
+            std::cout << "ReLaunch run for thread " << omp_get_thread_num() << std::endl;
             stopEval = queue.run();
 
             std::cout << "Ready to stop." << std::endl;

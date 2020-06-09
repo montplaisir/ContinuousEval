@@ -57,15 +57,20 @@ bool Queue::run()
     // On master, queue runs until stopMainEval() is true.
     while (!doStopMainEval && !_doneWithEval)
     {
-        std::cout << "In Queue::run(). Thread: " << omp_get_thread_num() << std::endl;
+        #pragma omp critical(printInfo)
+        {
+            std::cout << "In Queue::run(). Thread: " << omp_get_thread_num() << std::endl;
+        }
         if (!_queue.empty())
         {
-            //std::cout << "Thread: " << omp_get_thread_num() << " Calling EvalSinglePoint()." << std::endl;
             successFound = evalSinglePoint();
         }
         else if (!_doneWithEval)
         {
-            std::cout << "Thread: " << omp_get_thread_num() << " Waiting for points." << std::endl;
+            #pragma omp critical(printInfo)
+            {
+                std::cout << "Thread: " << omp_get_thread_num() << " Waiting for points." << std::endl;
+            }
         }
         else // Queue is empty and we are doneWithEval
         {
@@ -77,7 +82,10 @@ bool Queue::run()
         doStopMainEval = stopMainEval();
         omp_unset_lock(&_lockForAdd);
     }
-    std::cout << "Thread " << omp_get_thread_num() << " is out of while loop" << std::endl;
+    #pragma omp critical(printInfo)
+    {
+        std::cout << "Thread " << omp_get_thread_num() << " is out of while loop" << std::endl;
+    }
 
     return successFound;
 }
@@ -95,12 +103,18 @@ bool Queue::evalSinglePoint()
     {
         // Eval is between 1 and 50
         double eval = 1+std::rand()/((RAND_MAX + 1u)/50);
-        //std::cout << "In thread: " << omp_get_thread_num() << " Eval point " << *point << " to " << eval << std::endl;
+        #pragma omp critical(printInfo)
+        {
+            std::cout << "In thread: " << omp_get_thread_num() << " Eval point " << *point << " to " << eval << std::endl;
+        }
         point->setEval(eval);
         if (eval < point->getBestEval())
         {
             success = true;
-            std::cout << "Thread " << omp_get_thread_num() << ". New success found: " << *point << std::endl;
+            #pragma omp critical(printInfo)
+            {
+                std::cout << "Thread " << omp_get_thread_num() << ". New success found: " << *point << std::endl;
+            }
             // In NOMAD, we would update new point's best eval to this value.
             // Not done here - best eval is static.
         }
@@ -152,7 +166,10 @@ void Queue::setAllP1ToFalse()
         while (_queue.top()->getP1())
         {
             auto point = std::move(_queue.top());
-            std::cout << "Pop P1" << std::endl;
+            #pragma omp critical(printInfo)
+            {
+                std::cout << "Pop P1" << std::endl;
+            }
             _queue.pop();
             point->setP1(false);
             _queue.push(point);
@@ -179,7 +196,10 @@ void Queue::displayAndClear()
     while (!_queue.empty())
     {
         auto point = std::move(_queue.top());
-        std::cout << *point << std::endl;
+        #pragma omp critical(printInfo)
+        {
+            std::cout << *point << std::endl;
+        }
         _queue.pop();
     }
     omp_unset_lock(&_lockForAdd);
