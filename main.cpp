@@ -153,10 +153,6 @@ int main(int argc , char **argv)
     // Parameters used for all threads
     int nbEval = 6;
 
-    // Could be done better: stopEval is a mix of success (opportunistic)
-    // and of other conditions (stopMainEval())
-    bool stopEval = false;
-
     // Start all processes
     #pragma omp parallel num_threads(nbThreads) default(shared)
     {
@@ -235,7 +231,7 @@ int main(int argc , char **argv)
         {
             std::cout << "Launch run for thread " << omp_get_thread_num() << std::endl;
         }
-        stopEval = queue.run();
+        queue.run();
         #pragma omp critical(printInfo)
         {
             std::cout << "Done running for thread " << omp_get_thread_num() << std::endl;
@@ -244,37 +240,70 @@ int main(int argc , char **argv)
         // From here, only main threads are out of queue.run(). The other
         // threads are waiting for evaluation.
         // So we work on main threads only.
+        // Warning: pragma omp single cannot be used here, because it would wait endlessly
+        // for non-main threads.
+        // "pragma omp single nowait" may be used, but with caution, as the next steps
+        // might start before the current step is done.
         if (queue.isMainThread(threadNum))
         {
-            queue.setAllP1ToFalse();
-
-            #pragma omp critical(printInfo)
+            #pragma omp single nowait
             {
-                std::cout << std::endl << "Adding new points..." << std::endl;
+                queue.setAllP1ToFalse();
+            }
+
+            #pragma omp single nowait
+            {
+                #pragma omp critical(printInfo)
+                {
+                    std::cout << std::endl << "Adding new points via main thread " << threadNum << "..." << std::endl;
+                }
+                queue.startAdding();
+                for (QueuePointPtr pp : { pP1, pP2, pP3, pP4, pP5, pP6, pP13, pP14, \
+                                          pP15, pP16, pP17, pP18, pP19, pP20, pP21, \
+                                        })
+                {
+                    queue.addToQueue(pp);
+                }
+                queue.stopAdding();
             }
             #pragma omp single nowait
             {
+                #pragma omp critical(printInfo)
+                {
+                    std::cout << std::endl << "Adding new points via main thread " << threadNum << "..." << std::endl;
+                }
                 queue.startAdding();
-                for (QueuePointPtr pp : { pP1, pP2, pP3, pP4, pP5, pP6, pP13, pP14, \
-                                      pP15, pP16, pP17, pP18, pP19, pP20, pP21, \
-                                      pP22, pP23, pP24, pP25, pP26, pP27, pP28, \
-                                      pP29, pP30, pP31, pP32, pP33, pP34, pP35, \
-                                      pP36, pP37, pP38, pP39, pP40, pP41, pP42, \
-                                      pP43, pP44, pP45, pP46, pP47, pP48, pP49
-                                      })
+                for (QueuePointPtr pp : { pP22, pP23, pP24, pP25, pP26, pP27, pP28, \
+                                          pP29, pP30, pP31, pP32, pP33, pP34, pP35, \
+                                        })
+                {
+                    queue.addToQueue(pp);
+                }
+                queue.stopAdding();
+            }
+            #pragma omp single nowait
+            {
+                #pragma omp critical(printInfo)
+                {
+                    std::cout << std::endl << "Adding new points via main thread " << threadNum << "..." << std::endl;
+                }
+                queue.startAdding();
+                for (QueuePointPtr pp : { pP36, pP37, pP38, pP39, pP40, pP41, pP42, \
+                                          pP43, pP44, pP45, pP46, pP47, pP48, pP49
+                                        })
                 {
                     queue.addToQueue(pp);
                 }
                 queue.stopAdding();
             }
 
-            // All, the threads other than main are still available for evaluation.
+            // All the threads other than main are still available for evaluation.
             // Re-launch run for main threads only.
             #pragma omp critical(printInfo)
             {
-                std::cout << "Launch run for thread " << omp_get_thread_num() << std::endl;
+                std::cout << "ReLaunch run for thread " << omp_get_thread_num() << std::endl;
             }
-            stopEval = queue.run();
+            queue.run();
 
             #pragma omp critical(printInfo)
             {

@@ -126,6 +126,10 @@ void Queue::stop()
 {
     int threadNum = omp_get_thread_num();
     _mainThreadInfo.at(threadNum).setDoneWithEval(true);
+    #pragma omp critical(printInfo)
+    {
+        std::cout << "Queue::stop: Stop main thread " << threadNum << "." << std::endl;
+    }
 
     // Go through all main thread info to see if _doneWithEval must be set.
     // This part is not optimized, we can probably do better, but it does not 
@@ -136,11 +140,20 @@ void Queue::stop()
         if (allDone && !_mainThreadInfo.at(mainThreadNum).getDoneWithEval())
         {
             allDone = false;
+            #pragma omp critical(printInfo)
+            {
+                std::cout << "Queue::stop: Not done with queue because thread " << mainThreadNum << " is not done." << std::endl;
+            }
+            break;
         }
     }
 
     if (allDone)
     {
+        #pragma omp critical(printInfo)
+        {
+            std::cout << "Queue::stop: All main threads done. Done with queue." << std::endl;
+        }
         _doneWithEval = true;
     }
 
