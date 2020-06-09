@@ -73,7 +73,7 @@ public:
     }
     bool isMainThread(const int threadNum) const { return (_mainThreads.end() != _mainThreads.find(threadNum)); }
     const std::set<int>& getMainThreads() const { return _mainThreads; }
-    size_t getNbMainThreads() const { return _mainThreads.size(); }
+    int getNbMainThreads() const { return int(_mainThreads.size()); }
 
     // Other methods
 
