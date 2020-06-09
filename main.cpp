@@ -49,24 +49,33 @@ double OrderByDirection::_dirY = 0.0;
 // Calling argument: Number of threads to use.
 int main(int argc , char **argv)
 {
-    const int nbMainThreads = 3;
-    int nbThreads = omp_get_num_threads();
+    int nbThreads = omp_get_max_threads();
+    int nbMainThreads = nbThreads / 3 + 1;
     if (argc > 1)
     {
         nbThreads = std::atoi(argv[1]);
+        nbMainThreads = nbThreads / 3 + 1;
         if (0 == nbThreads)
         {
-            nbThreads = omp_get_num_threads();
+            nbThreads = omp_get_max_threads();
+        }
+        if (argc > 2)
+        {
+            nbMainThreads = std::atoi(argv[2]);
+            if (0 == nbMainThreads)
+            {
+                nbMainThreads = 1;
+            }
         }
     }
     if (nbThreads < nbMainThreads)
     {
-        std::cout << "Warning: number of threads was " << nbThreads << ". Set to " << nbMainThreads*2 << "." << std::endl;
-        nbThreads = nbMainThreads*2;
+        std::cerr << "Error: number of main threads (" << nbMainThreads << ") should be less or equal to number of threads (" << nbThreads << ")." << std::endl;
+        return 1;
     }
     else
     {
-        std::cout << "Working with " << nbThreads << " threads." << std::endl;
+        std::cout << "Working with " << nbMainThreads << " main thread" << (nbMainThreads > 1 ? "s" : "") << " on a total of " << nbThreads << " thread" << (nbThreads > 1 ? "s" : "") << "." << std::endl;
     }
 
     // Create queue for all threads
