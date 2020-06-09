@@ -95,7 +95,6 @@ bool Queue::run()
 
         if (!conditionForStop && !_queue.empty())
         {
-            //std::cout << "Thread: " << omp_get_thread_num() << " Calling EvalSinglePoint()." << std::endl;
             successFound = evalSinglePoint();
         }
         else if (!_doneWithEval)
